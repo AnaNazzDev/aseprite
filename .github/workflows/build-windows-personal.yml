@@ -37,7 +37,7 @@ jobs:
         shell: bash
         run: |
           cmake -S . -B build -G Ninja \
-            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DCMAKE_BUILD_TYPE=Release \
             -DENABLE_TESTS=OFF \
             -DENABLE_SCRIPTING=ON \
             -DLAF_BACKEND=skia \
@@ -46,7 +46,7 @@ jobs:
 
       - name: Compile
         shell: bash
-        run: cmake --build build --target aseprite --parallel 2
+        run: cmake --build build --target aseprite --parallel
 
       - name: Prepare portable version
         shell: pwsh
