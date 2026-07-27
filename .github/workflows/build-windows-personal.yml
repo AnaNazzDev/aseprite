@@ -1,0 +1,63 @@
+name: Build Aseprite Windows
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/build-windows-personal.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - uses: aseprite/get-ninja@main
+
+      - uses: TheMrMilchmann/setup-msvc-dev@v4
+        with:
+          arch: x64
+
+      - name: Download Skia
+        shell: bash
+        run: |
+          skia_url=$(source "$GITHUB_WORKSPACE/laf/misc/skia-url.sh" | xargs)
+          skia_file=$(basename "$skia_url")
+          curl --ssl-revoke-best-effort -L --fail --retry 3 -o "$skia_file" "$skia_url"
+          unzip -q "$skia_file" -d skia
+
+      - name: Configure
+        shell: bash
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DENABLE_TESTS=OFF \
+            -DENABLE_SCRIPTING=ON \
+            -DLAF_BACKEND=skia \
+            -DSKIA_DIR="$(realpath skia)" \
+            -DSKIA_LIBRARY_DIR="$(realpath skia/out/Release-x64)"
+
+      - name: Compile
+        shell: bash
+        run: cmake --build build --target aseprite --parallel 2
+
+      - name: Prepare portable version
+        shell: pwsh
+        run: |
+          $package = Join-Path $env:RUNNER_TEMP "Aseprite-Windows-x64"
+          New-Item -ItemType Directory -Force -Path $package | Out-Null
+          Copy-Item "build/bin/*" $package -Recurse -Force
+
+      - name: Upload Aseprite
+        uses: actions/upload-artifact@v6
+        with:
+          name: Aseprite-Windows-x64
+          path: ${{ runner.temp }}/Aseprite-Windows-x64
+          retention-days: 1
