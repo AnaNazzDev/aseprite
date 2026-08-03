@@ -12,45 +12,33 @@ permissions:
 jobs:
   build:
     runs-on: windows-latest
-    timeout-minutes: 900
+    timeout-minutes: 90
 
     steps:
-      - uses: actions/checkout@v7
+      - name: Download Aseprite
+        uses: actions/checkout@v7
         with:
           submodules: recursive
 
-      - uses: aseprite/get-ninja@main
+      - name: Install Ninja
+        uses: aseprite/get-ninja@main
 
-      - uses: TheMrMilchmann/setup-msvc-dev@v4
+      - name: Configure Visual Studio
+        uses: TheMrMilchmann/setup-msvc-dev@v4
         with:
           arch: x64
 
-      - name: Download Skia
+      - name: Build Aseprite with official script
         shell: bash
-        run: |
-          skia_url=$(source "$GITHUB_WORKSPACE/laf/misc/skia-url.sh" | xargs)
-          skia_file=$(basename "$skia_url")
-          curl --ssl-revoke-best-effort -L --fail --retry 3 -o "$skia_file" "$skia_url"
-          unzip -q "$skia_file" -d skia
-
-      - name: Configure
-        shell: bash
-        run: |
-          cmake -S . -B build -G Ninja \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DENABLE_TESTS=OFF \
-            -DENABLE_SCRIPTING=ON \
-            -DLAF_BACKEND=skia \
-            -DSKIA_DIR="$(realpath skia)" \
-            -DSKIA_LIBRARY_DIR="$(realpath skia/out/Release-x64)"
-
-      - name: Compile
-        shell: bash
-        run: cmake --build build --target aseprite --parallel
+        run: bash build.sh --auto --norun
 
       - name: Prepare portable version
         shell: pwsh
         run: |
+          if (!(Test-Path "build/bin/aseprite.exe")) {
+            throw "aseprite.exe n'a pas été généré"
+          }
+
           $package = Join-Path $env:RUNNER_TEMP "Aseprite-Windows-x64"
           New-Item -ItemType Directory -Force -Path $package | Out-Null
           Copy-Item "build/bin/*" $package -Recurse -Force
@@ -60,4 +48,6 @@ jobs:
         with:
           name: Aseprite-Windows-x64
           path: ${{ runner.temp }}/Aseprite-Windows-x64
+          if-no-files-found: error
           retention-days: 1
+          compression-level: 6
